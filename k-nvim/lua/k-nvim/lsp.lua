@@ -27,6 +27,19 @@ function M.setup(opts)
     return
   end
 
+  -- Function to start LSP for a buffer
+  local function start_lsp(bufnr)
+    local root_dir = vim.fs.root(bufnr, config.root_markers) or vim.fn.getcwd()
+    vim.lsp.start({
+      name = "klsp",
+      cmd = config.cmd,
+      root_dir = root_dir,
+      settings = config.settings,
+    }, {
+      bufnr = bufnr,
+    })
+  end
+
   -- Use vim.lsp.config (Neovim 0.11+) if available
   if vim.lsp.config then
     vim.lsp.config.klsp = {
@@ -43,18 +56,20 @@ function M.setup(opts)
     vim.api.nvim_create_autocmd("FileType", {
       pattern = config.filetypes,
       callback = function(args)
-        -- Find root directory
-        local root_dir = vim.fs.root(args.buf, config.root_markers) or vim.fn.getcwd()
-
-        vim.lsp.start({
-          name = "klsp",
-          cmd = config.cmd,
-          root_dir = root_dir,
-          settings = config.settings,
-        })
+        start_lsp(args.buf)
       end,
       group = vim.api.nvim_create_augroup("KFrameworkLsp", { clear = true }),
     })
+  end
+
+  -- Start LSP for any already-open K buffers
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) then
+      local ft = vim.bo[buf].filetype
+      if vim.tbl_contains(config.filetypes, ft) then
+        start_lsp(buf)
+      end
+    end
   end
 end
 
